@@ -22,4 +22,27 @@
 xDS以及各个资源之间的关系：
 ![img_1.png](img_1.png)
 
+---
+1、基本术语
+- Host
+  - 能够进行网络通信的实体
+- Downstream
+  - 下游（downstream）主机连接到 Envoy，发送请求并或获得响应
+- Upstream
+  - 上游（upstream）主机获取来自 Envoy 的链接请求和响应
+- Cluster
+  - 集群（cluster）是 Envoy 连接到的一组逻辑上相似的上游主机
+- Mesh
+  - 一组互相协调以提供一致网络拓扑的主机
+- 运行时配置
+  - 与 Envoy 一起部署的带外实时配置系统
+- Listener
+  - 侦听器（listener）是可以由下游客户端连接的命名网络位置（例如，端口、unix域套接字等）
+- Listener filter
+  - Listener 使用 listener filter（监听器过滤器）来操作链接的元数据
+- Http Route Table
+  - HTTP 的路由规则，例如请求的域名，Path 符合什么规则，转发给哪个 Cluster
+- Health checking
+  - 健康检查会与 SDS 服务发现配合使用
+
 
