@@ -117,7 +117,7 @@ istio 提供三种不同类型的数据：
 ---
 **第三章：架构解析**
 
-1) 控制平面    
+##### 1) 控制平面    
 
 1、Pilot
 - 管理和配置部署在特定 Istio 服务网格中所有 Sidecar 代理实例
@@ -212,3 +212,48 @@ SDS 工作流程：
 
 3、Galley
 - 提供配置验证功能，还负责配置的管理和分发
+
+**配置验证功能：**
+- 使用 kubernetes 提供的一个 Admission Webhook -- ValidatingWebhookConfiguration 来做配置的验证
+- istio-galley
+  - /admitmixer --> wh.serveAdmitMixer
+  - /admitpilot --> wh.serveAdmitPilot
+
+**配置管理实现：**
+- Processor 
+  - Source：代表 Galley 管理配置来源
+  - Handler：对 "配置" 事件进行处理的处理器
+  - State：Galley 管理的配置在内存中状态
+- MCP（gRPC Server）
+
+**MCP 协议：**
+MCP 提供了一套用于配置订阅和分发的 API 
+- source：配置提供端，在 Istio 中， Galley 即 source 
+- sink：配置的消费端，在 Istio 中，包括 Pilot/Mixer 组件
+- resource：source 和 sink 关注的资源体，就是 Istio 中的 "配置"
+
+提供两个 service：
+- ResourceSource
+- ResourceSink
+
+
+##### 2) 数据平面 
+
+1、数据平面主要负责执行任务
+- 服务发现：探测所有可用的上游或后端服务实例
+- 健康检测：探测上游或后端服务实例是否健康，是否准备好接收网络流量
+- 流量路由：将网络请求路由到正确的上游或后端服务
+- 负载均衡：在对上游或后端服务请求时，选择合适的服务实例接收请求，同时负责处理超时，短路，重试等情况
+- 身份认证和授权：对网络请求进行身份认证，权限认证
+- 链路追踪：对每个请求生成详细的统计信息
+
+2、常见数据平面实现
+- Envoy
+- MOSN 
+- Linkerd 
+
+
+
+
+
+
