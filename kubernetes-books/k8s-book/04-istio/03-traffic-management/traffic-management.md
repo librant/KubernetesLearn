@@ -202,8 +202,101 @@ kubectl delete -f httpbin-sleep-curl-deploy.yaml
 ```
 ![img_10.png](img_10.png)
 
+#### **4、Ingress/Egress**
+- 微服务集群的出入口流量需要单独管理
 
+1) ingress
 
+**启动 httpbin 服务**
+```shell
+kubectl apply -f samples/httpbin/httpbin.yaml
+```
+![img_11.png](img_11.png)
+
+**确定 Ingress IP 和端口**
+```shell
+kubectl apply -f httpbin-ingress-gw.yaml
+```
+
+确认集群是否运行在支持外部负载均衡：
+```shell
+kubectl get svc istio-ingressgateway -n istio-system
+```
+![img_12.png](img_12.png)
+
+当前集群不支持外部 LB, 使用 nodePort 类型 service:
+- 设置 Ingress 端口
+```shell
+export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].nodePort}')
+export SECURE_INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}')
+export TCP_INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="tcp")].nodePort}')
+```
+- 设置 Ingress IP
+```shell
+export INGRESS_HOST=$(kubectl get po -l istio=ingressgateway -n istio-system -o jsonpath='{.items[0].status.hostIP}')
+```
+
+- EXTERNAL-IP 值已设置，说明环境正在使用外部负载均衡，可以用其为 Ingress Gateway 提供服务。
+- EXTERNAL-IP 值为 <none> （或持续显示 <pending>），说明环境没有为 Ingress Gateway 提供外部负载均衡，无法使用 Ingress Gateway
+
+**使用 Istio Gateway 配置 Ingress**
+
+- 创建 Istio Gateway：
+```shell
+kubectl apply -f httpbin-ingress-gw.yaml
+```
+
+- 为通过 Gateway 的入口流量配置路由
+```shell
+kubectl apply -f httpbin-ingress-vs.yaml
+```
+
+- 使用 curl 访问 httpbin 服务：
+```shell
+curl -s -I -HHost:httpbin.example.com "http://$INGRESS_HOST:$INGRESS_PORT/status/200"
+```
+![img_13.png](img_13.png)
+
+- 访问其他没有被显式暴露的 URL 时，将看到 HTTP 404 错误：
+```shell
+curl -s -I -HHost:httpbin.example.com "http://$INGRESS_HOST:$INGRESS_PORT/headers"
+```
+![img_14.png](img_14.png)
+
+注意上文命令使用 -H 标识将 HTTP 头部参数 Host 设置为 “httpbin.example.com”。
+该操作为必须操作，因为 Ingress Gateway 已被配置用来处理 “httpbin.example.com” 的服务请求，而在测试环境中并没有为该主机绑定 DNS，
+而是简单直接地向 Ingress IP 发送请求。
+
+**理解原理：**   
+Gateway 配置资源允许外部流量进入 Istio 服务网格，并对边界服务实施流量管理和 Istio 可用的策略特性。
+在前面的步骤中，在服务网格中创建一个服务并向外部流量暴露该服务的 HTTP 端点。
+
+**问题排查：**
+- 检查环境变量 INGRESS_HOST and INGRESS_PORT。确保环境变量的值有效
+```shell
+kubectl get svc -n istio-system
+```
+![img_15.png](img_15.png)
+
+- 检查没有在相同的端口上定义其它 Istio Ingress Gateways
+```shell
+kubectl get gateway --all-namespaces
+```
+![img_16.png](img_16.png)
+
+- 检查没有在相同的 IP 和端口上定义 Kubernetes Ingress 资源：
+```shell
+kubectl get ingress --all-namespaces
+```
+![img_17.png](img_17.png)
+
+2) 清理
+```shell
+kubectl delete -f httpbin-ingress-vs.yaml
+kubectl delete -f httpbin-ingress-gw.yaml
+kubectl delete -f ../istio-1.16.1/samples/httpbin/httpbin.yaml
+```
+![img_18.png](img_18.png)
 
 ---
 
