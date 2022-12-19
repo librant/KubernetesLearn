@@ -26,7 +26,7 @@ kubectl exec "$(kubectl get pod -l app=ratings -o jsonpath='{.items[0].metadata.
 
 4、确定 Ingress 的 IP 地址和端口
 ```shell
-kubectl apply -f samples/bookinfo/networking/bookinfo-gateway.yaml
+kubectl apply -f samples/bookinfo/networking/bookinfo-gw.yaml
 ```
 
 1) 查看 gateway 资源
