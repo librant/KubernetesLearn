@@ -58,6 +58,7 @@ kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.por
 
 不支持则设置入站的端口：
 ```shell
+export INGRESS_HOST=$(kubectl get po -l istio=ingressgateway -n istio-system -o jsonpath='{.items[0].status.hostIP}')
 export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].nodePort}')
 export SECURE_INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}')
 ```
@@ -73,6 +74,8 @@ export GATEWAY_URL=$INGRESS_HOST:$INGRESS_PORT
 echo $GATEWAY_URL
 ```
 ![img_4.png](img_4.png)
+
+
 
 
 
