@@ -290,13 +290,126 @@ kubectl get ingress --all-namespaces
 ```
 ![img_17.png](img_17.png)
 
-2) 清理
+2) 清理 ingress
 ```shell
 kubectl delete -f httpbin-ingress-vs.yaml
 kubectl delete -f httpbin-ingress-gw.yaml
 kubectl delete -f ../istio-1.16.1/samples/httpbin/httpbin.yaml
 ```
 ![img_18.png](img_18.png)
+
+3) egress
+
+**部署 sleep 这个示例应用**
+```shell
+kubectl apply -f sleep-egress.yaml
+```
+![img_20.png](img_20.png)
+
+**设置环境变量 SOURCE_POD，值为你的源 pod 的名称**
+```shell
+export SOURCE_POD=$(kubectl get pod -l app=sleep -o jsonpath={.items..metadata.name})
+```
+![img_21.png](img_21.png)
+
+**查询 Egress 的 TrafficPolicy.mode 值**
+```shell
+kubectl get istiooperator installed-state -n istio-system -o jsonpath='{.spec.meshConfig.outboundTrafficPolicy.mode}'
+```
+![img_19.png](img_19.png)
+
+- 设置为ALLOW_ANY或被省略
+
+**更改为默认的封锁策略**
+- 执行以下命令来将 global.outboundTrafficPolicy.mode 选项改为 REGISTRY_ONLY 
+  - 使用 IstioOperator CR 安装 Istio，请在配置中添加以下字段：
+```yaml
+spec:
+  meshConfig:
+    outboundTrafficPolicy:
+      mode: REGISTRY_ONLY
+```
+  - 使用 istioctl install 命令进行安装
+```shell
+istioctl install --set profile=demo -y --set meshConfig.outboundTrafficPolicy.mode=REGISTRY_ONLY
+```
+![img_22.png](img_22.png)
+
+**从 SOURCE_POD 向外部 HTTPS 服务发出几个请求，验证它们现在是否被阻止**
+```shell
+kubectl exec -it $SOURCE_POD -c sleep -- curl -I https://www.google.com | grep  "HTTP/"; kubectl exec -it $SOURCE_POD -c sleep -- curl -I https://edition.cnn.com | grep "HTTP/"
+```
+![img_23.png](img_23.png)
+
+**访问一个外部的 HTTP 服务**
+- 创建一个 ServiceEntry，以允许访问一个外部的 HTTP 服务：
+```shell
+kubectl apply -f httpbin-egress-http-se.yaml
+```
+
+- 从 SOURCE_POD 向外部的 HTTP 服务发出一个请求
+```shell
+kubectl exec -it $SOURCE_POD -c sleep -- curl http://httpbin.org/headers
+```
+![img_24.png](img_24.png)
+
+注意由 Istio sidecar 代理添加的 headers: X-Envoy-Decorator-Operation
+
+- 检查 SOURCE_POD 的 sidecar 代理的日志
+```shell
+kubectl logs $SOURCE_POD -c istio-proxy | tail
+```
+![img_25.png](img_25.png)
+
+**访问一个外部的 HTTPS 服务**
+- 创建一个 ServiceEntry，以允许访问一个外部的 HTTPS 服务：
+```shell
+kubectl apply -f httpbin-egress-https-se.yaml
+```
+
+- 从 SOURCE_POD 往外部 HTTPS 服务发送请求
+```shell
+kubectl exec -it $SOURCE_POD -c sleep -- curl -I https://www.baidu.com | grep  "HTTP/"
+```
+![img_26.png](img_26.png)
+
+- 检查 SOURCE_POD 的 sidecar 代理的日志
+```shell
+kubectl logs $SOURCE_POD -c istio-proxy | tail
+```
+![img_27.png](img_27.png)
+
+**管理到外部服务的流量**
+- 从用作测试源的 pod 内部，向外部服务 httpbin.org 的 /delay endpoint 发出 curl 请求：
+```shell
+kubectl exec "$SOURCE_POD" -c sleep -- time curl -o /dev/null -sS -w "%{http_code}\n" http://httpbin.org/delay/5
+```
+![img_28.png](img_28.png)
+
+- 退出测试源 pod，使用 kubectl 设置调用外部服务 httpbin.org 的超时时间为 3 秒
+```shell
+kubectl apply -f httpbin-egress-vs.yaml
+```
+
+- 几秒后，重新发出 curl 请求
+```shell
+# 登录到 sleep 容器中
+kubectl exec $SOURCE_POD -c sleep -- /bin/bash
+# 在容器中执行
+time curl -o /dev/null -s -w "%{http_code}\n" http://httpbin.org/delay/5
+```
+![img_29.png](img_29.png)
+
+Istio 在 3 秒后切断了响应时间为 5 秒的 httpbin.org 服务
+
+4) 清理 egress
+```shell
+kubectl delete -f httpbin-egress-http-se.yaml
+kubectl delete -f httpbin-egress-https-se.yaml
+kubectl delete -f sleep-egress.yaml
+kubectl delete -f httpbin-egress-vs.yaml
+```
+![img_30.png](img_30.png)
 
 ---
 
