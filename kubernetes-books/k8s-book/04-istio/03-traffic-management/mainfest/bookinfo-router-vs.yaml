@@ -1,0 +1,25 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: reviews
+  namespace: default
+spec:
+  # 绑定一个 Gateway，将来自 ext-host.example.com 的流量引入 一个 VirtualService
+  gateway:
+    - ext-host.example.com
+  hosts:
+    - reviews
+  http:
+    - match:
+        - headers:
+            end-user:
+              exact: jason
+      route:
+        - destination:
+            host: reviews
+            subset: v2
+          weight: 25
+        - destination:
+            host: reviews
+            subset: v3
+          weight: 75

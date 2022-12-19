@@ -1,0 +1,20 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: bookinfo-ext-gateway
+  namespace: default
+spec:
+  selector:
+    app: my-gateway-controller
+  servers:
+    - hosts:
+        - ext-host.example.com
+      # Gateway Pod 暴露的端口信息
+      tls:
+        mode: SIMPLE
+        serverCertificate: /tmp/tls.crt
+        privateKey: /tmp/tls.key
+      port:
+        name: https
+        number: 443
+        protocol: HTTPS

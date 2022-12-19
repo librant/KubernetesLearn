@@ -5,7 +5,7 @@ metadata:
 spec:
   hosts:
     - api.dropboxapi.com
-  location: MESH_EXTERNAL
+  location: MESH_INTERNAL
   ports:
     - number: 443
       name: https

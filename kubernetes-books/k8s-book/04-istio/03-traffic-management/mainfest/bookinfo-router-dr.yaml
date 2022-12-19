@@ -1,0 +1,26 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: bookinfo-my-destination-rule
+spec:
+  host:  my-svc
+  trafficPolicy:
+    loadBalancer:
+      # 默认的负载均衡策略模型为随机
+      simple: RANDOM
+  subsets:
+  # subset1 将流量转发到具有标签 version: v1 的 Deployment 对应的服务上
+  - name: v1
+    labels:
+      version: v1
+  # subset2 将流量转发到具有标签 version: v2 的 Deployment 对应的服务上，指定负载均衡为轮询
+  - name: v2
+    labels:
+      version: v2
+    trafficPolicy:
+      loadBalancer:
+        simple: ROUND_ROBIN
+  # subset3 将流量转发到具有标签 version: v3 的 Deployment 对应的服务上
+  - name: v3
+    labels:
+      version: v3

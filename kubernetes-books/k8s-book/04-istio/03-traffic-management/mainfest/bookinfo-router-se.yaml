@@ -1,0 +1,25 @@
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: extent-svc-mongocluster
+spec:
+  exportTo:
+    # 用于控制 ServiceEntry 跨命名空间的可见性
+    # . 表示应用到当前命名空间， * 表示应用到所有的命名空间
+    - '*'
+  hosts:
+    - mymongodb.somedomain
+  addresses:
+    # VIPs
+    - 192.192.192.192/24
+  # 用于指定该服务属于网格内部还是外部
+  location: MESH_EXTERNAL
+  # 主机的服务发现模式 NONE/STATIC/DNS
+  resolutions: STATIC
+  ports:
+    - number: 27018
+      name: mongodb
+      protocol: MONGO
+  endpoints:
+    - address: 2.2.2.2
+    - address: 3.3.3.3

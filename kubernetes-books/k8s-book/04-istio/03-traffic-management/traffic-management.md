@@ -1,7 +1,7 @@
 
-#### Traffic Management
+### Traffic Management
 
-**1、流量控制 CRD** 
+#### **1、流量控制 CRD** 
 - VirtualService
   - 控制流量转发规则及 API 粒度治理功能，包括错误注入，域控制等
 - DestinationRule
@@ -45,6 +45,165 @@ global.outbandTrafficPolicy.mode:
 
 5) Sidecar
 - 在默认情况下，Istio 中所有 Pod 的 Envoy 代理都是可以被寻址的
+
+
+#### **2、路由**   
+路由规则可以让用户很容易地控制服务之间的流量和 API 调用
+
+1) VirtualService
+- 由一组路由规则组成，用于对服务实体（kubernetes 中对应为 pod）进行寻址
+- 描述了用户可寻址目标到网格内实际工作负载的映射
+- 通过对客户端请求的目标地址与真实响应请求的目标工作负载进行解耦来实现
+- 可以为1个或者多个主机指定流量行为
+
+2) 路由规则
+路由规则一般定义在 VirtualService 的 hosts 字段和 http 字段中
+- hosts: 描述该路由规则生效的目标服务
+- http: 描述流量匹配条件和路由目标地址
+
+**匹配条件：**
+- match 字段进行限定（bookinfo-router-vs.yaml）
+
+**Destination：**
+- destination 字段可以指定符合条件的流量目标地址
+
+**路由规则的优先级：**
+- 从上到下的顺序进行选择
+- route 字段中定于的 destination 顺序
+
+**路由规则的更多内容：**
+- 将特定的流量子集路由到特定目标地址的工具
+- 在 VirtualService 中，流量端口，header 字段和 URI 等内容上都是可以设置匹配条件
+
+3) DestinationRule   
+- DestinationRule 是在 VirtualService 路由规则之后起作用
+- 允许在调用完整的目标服务或特定的服务子集
+  - Random: 将请求转发到一个随机的实例上
+  - Weighted: 按照指定的百分比将请求转发到实例上
+  - Least Requests: 将请求转发到具有最少请求数目的实例上
+
+4) Gateway   
+- 管理进出网格的流量，可以指定进入或离开网络的流量
+- 为 Gateway 指定路由，需要通过 VirtualService 的 Gateway 字段，将 Gateway 绑定到一个 VirtualService 上
+
+5) ServiceEntry    
+- 支持对接 kubernetes, consul 等多种不同的注册中心
+- 将外部的服务条目添加到 Istio 内部的服务注册表中，以便让网格中的服务能够访问并路由到这些手动指定的服务
+
+**使用 ServiceEntry 访问外部服务：**    
+- 允许 Sidecar 将请求传递到未在网格内配置过的任何外部服务
+- 配置 ServiceEntry 以提供对外部服务的受控访问
+- 允许特定范围内的 IP 地址，完全绕过 Sidecar
+
+**Sidecar 对外部服务的处理方式：**    
+- ALLOW_ANY：默认值，表示 Istio 代理允许调用未知的外部服务
+- REGISTRY_ONLY：Istio 代理会阻止任何没有在网格中定义的 HTTP 服务或 ServiceEntry 主机
+
+查看当前使用的模式：
+```shell
+kubectl get cm istio -n istio-system -o yaml | grep -o "mode:"
+```
+
+**使用 ServiceEntry 管理外部流量：**   
+- 结合 VirtualService 为对应的 ServiceEntry 配置外部服务访问规则，如请求超时，故障注入等，实现对指定服务的受控访问
+- fault 字段进行配置
+
+
+#### **3、流量镜像**
+影子流量，通过配置将线上的真实流量复制一份到镜像服务中，并通过流量镜像转发，从而达到在不影响线上服务的情况下对流量或请求内容做具体分析的目的
+
+1) 流量镜像的配置
+- 通过 VirtualService 中 http 配置项
+  - mirror: 用于配置一个 Destination 类型的对象，即镜像流量转发的服务地址
+  - mirrorPercentage: 用于配置一个数值，用来指定有多少的原始流量会被转发到镜像流量服务中
+
+2) 流量镜像实践
+
+**部署测试服务：**
+
+- 部署两个版本的 httpbin 服务
+```shell
+kubectl apply -f httpbin-mirror-deploy-v1.yaml
+kubectl apply -f httpbin-mirror-deploy-v2.yaml
+```
+![img.png](img.png)
+
+- 部署一个 httpbin 的 service 
+```shell
+kubectl apply -f httpbin-mirrir-svc.yaml
+```
+![img_1.png](img_1.png)
+
+- 创建一个默认的路由策略
+```shell
+kubectl apply -f httpbin-mirror-vs-v1.yaml
+kubectl apply -f httpbin-mirror-dr.yaml
+```
+![img_2.png](img_2.png)
+
+- 向服务发送一部分流量
+```shell
+# 获取 sleep pod 的 name
+export SLEEP_POD=$(kubectl get pod -l app=sleep -o jsonpath={.items..metadata.name})
+# 登录 pod, 执行 curl 命令
+kubectl exec "${SLEEP_POD}" -c sleep -- curl -sS http://httpbin:8000/headers
+```
+![img_4.png](img_4.png)
+
+- 分别查看 v1 和 v2 版本的日志
+```shell
+export V1_POD=$(kubectl get pod -l app=httpbin,version=v1 -o jsonpath={.items..metadata.name})
+kubectl logs "$V1_POD" -c httpbin
+```
+![img_5.png](img_5.png)
+
+```shell
+export V2_POD=$(kubectl get pod -l app=httpbin,version=v2 -o jsonpath={.items..metadata.name})
+kubectl logs "$V2_POD" -c httpbin
+```
+![img_6.png](img_6.png)
+
+此时 v2 版本没有收到对应的请求信息
+
+- 镜像流量到 v2
+```shell
+kubectl apply -f httpbin-mirror-vs-v2.yaml
+```
+
+- 发送流量
+```shell
+kubectl exec "${SLEEP_POD}" -c sleep -- curl -sS http://httpbin:8000/headers
+```
+![img_7.png](img_7.png)
+
+- 分别查看 v1 和 v2 版本的日志
+```shell
+kubectl logs "$V1_POD" -c httpbin
+```
+![img_8.png](img_8.png)
+
+```shell
+kubectl logs "$V2_POD" -c httpbin
+```
+![img_9.png](img_9.png)
+
+3) 清理
+- 删除规则
+```shell
+kubectl delete -f httpbin-mirror-vs-v2.yaml
+kubectl delete -f httpbin-mirror-dr.yaml
+```
+- 关闭 Httpbin 服务和客户端
+```shell
+kubectl delete -f httpbin-mirror-svc.yaml
+kubectl delete -f httpbin-mirror-deploy-v2.yaml
+kubectl delete -f httpbin-mirror-deploy-v1.yaml
+kubectl delete -f httpbin-sleep-curl-deploy.yaml
+```
+![img_10.png](img_10.png)
+
+
+
 
 ---
 
