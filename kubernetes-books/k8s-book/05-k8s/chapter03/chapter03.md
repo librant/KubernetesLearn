@@ -8,7 +8,7 @@ Docker 在逻辑上分成一下几个部分：
 - Docker client: Docker 的客户端，用于执行 Docker 的相关命令，比如镜像下载
 - Docker Daemon: Docker 的守护进程
 - Docker Image: Docker 镜像，用于启动容器实例
-- Docker Conatainer: Docker 容器，由镜像启动，容器内运行相关的应用程序
+- Docker Container: Docker 容器，由镜像启动，容器内运行相关的应用程序
 
 **2、Docker 基本命令**
 
